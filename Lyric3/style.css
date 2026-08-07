@@ -1,0 +1,221 @@
+:root{
+  --void:#04030a;
+  --deep:#080a1e;
+  --nebula-blue:#3b6bf6;
+  --nebula-purple:#8b5cf6;
+  --nebula-cyan:#22d3ee;
+  --star-white:#f4f6ff;
+
+  --cam-x:0;
+  --cam-y:0;
+  --shake-x:0px;
+  --shake-y:0px;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+html,body{
+  width:100%;
+  height:100%;
+  background:var(--void);
+  overflow:hidden;
+  overscroll-behavior:none;
+}
+
+body{
+  font-family:'Inter',sans-serif;
+  perspective:1400px;
+  perspective-origin:50% 45%;
+  cursor:crosshair;
+}
+
+/* ============================================================
+   STAGE / RIG — the tilting, parallaxing camera volume
+   ============================================================ */
+.rig{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(59,107,246,0.10), transparent 55%),
+    radial-gradient(ellipse at 50% 100%, rgba(139,92,246,0.14), transparent 60%),
+    linear-gradient(180deg, var(--void) 0%, var(--deep) 55%, #050311 100%);
+  transform-style:preserve-3d;
+  transform:
+    rotateY(calc(var(--cam-x) * 4deg))
+    rotateX(calc(var(--cam-y) * -4deg))
+    translate3d(var(--shake-x), var(--shake-y), 0);
+  transition:transform .05s linear;
+  will-change:transform;
+}
+
+.layer{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+
+.layer-cosmos{
+  transform:translate3d(calc(var(--cam-x) * 14px), calc(var(--cam-y) * 14px), 0px);
+}
+
+.layer-galaxy{
+  transform:translate3d(calc(var(--cam-x) * 42px), calc(var(--cam-y) * 42px), 60px)
+            rotate(calc(var(--cam-x) * 2deg));
+  filter:drop-shadow(0 0 40px rgba(139,92,246,0.25));
+}
+
+.layer-fx{
+  transform:translate3d(calc(var(--cam-x) * 8px), calc(var(--cam-y) * 8px), 30px);
+}
+
+canvas.layer{ display:block; }
+
+/* ============================================================
+   LYRIC
+   ============================================================ */
+.lyric-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:0 6vw;
+  transform:translate3d(calc(var(--cam-x) * 10px), calc(var(--cam-y) * 10px), 90px);
+  pointer-events:none;
+}
+
+.lyric-eyebrow{
+  font-family:'Inter',sans-serif;
+  font-weight:400;
+  font-size:0.72rem;
+  letter-spacing:6px;
+  text-transform:uppercase;
+  color:rgba(244,246,255,0.38);
+  margin-bottom:22px;
+  opacity:0;
+  animation:eyebrowIn 2s ease forwards .4s;
+}
+@keyframes eyebrowIn{ to{ opacity:1; } }
+
+.lyric-line{
+  font-family:'Orbitron',sans-serif;
+  font-weight:700;
+  font-size:clamp(1.5rem, 4.4vw, 3.4rem);
+  line-height:1.35;
+  color:var(--star-white);
+  max-width:16ch;
+  letter-spacing:0.5px;
+  text-shadow:
+    0 0 12px rgba(139,92,246,0.55),
+    0 0 32px rgba(59,107,246,0.4),
+    0 0 70px rgba(34,211,238,0.25);
+  opacity:0;
+  filter:blur(14px);
+  transform:translateY(28px) scale(0.96);
+}
+
+/* enter animation — fade + blur clear + slide up + subtle scale */
+.lyric-line.enter{
+  animation:lyricEnter 1.4s cubic-bezier(.19,1,.22,1) forwards;
+}
+@keyframes lyricEnter{
+  0%{ opacity:0; filter:blur(14px); transform:translateY(28px) scale(0.96); }
+  60%{ opacity:1; filter:blur(0px); transform:translateY(0) scale(1.015); }
+  100%{ opacity:1; filter:blur(0px); transform:translateY(0) scale(1); }
+}
+
+/* exit animation — fade + blur + slight rise */
+.lyric-line.exit{
+  animation:lyricExit .7s cubic-bezier(.55,0,1,.45) forwards;
+}
+@keyframes lyricExit{
+  0%{ opacity:1; filter:blur(0px); transform:translateY(0) scale(1); }
+  100%{ opacity:0; filter:blur(10px); transform:translateY(-18px) scale(0.985); }
+}
+
+/* ============================================================
+   CINEMATIC OVERLAYS (outside rig, always screen-locked)
+   ============================================================ */
+.vignette{
+  position:fixed;
+  inset:0;
+  z-index:20;
+  pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%);
+  mix-blend-mode:multiply;
+}
+
+.scanline-glow{
+  position:fixed;
+  inset:0;
+  z-index:19;
+  pointer-events:none;
+  background:radial-gradient(circle at 50% 42%, rgba(139,92,246,0.10), transparent 60%);
+  animation:breathe 8s ease-in-out infinite;
+  mix-blend-mode:screen;
+}
+@keyframes breathe{
+  0%,100%{ opacity:0.55; }
+  50%{ opacity:1; }
+}
+
+.grain{
+  position:fixed;
+  inset:-4px;
+  z-index:21;
+  pointer-events:none;
+  opacity:0.05;
+  mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  animation:grainShift 1.4s steps(4) infinite;
+}
+@keyframes grainShift{
+  0%{ transform:translate(0,0); }
+  25%{ transform:translate(-1%,1%); }
+  50%{ transform:translate(1%,-1%); }
+  75%{ transform:translate(-1%,-1%); }
+  100%{ transform:translate(0,0); }
+}
+
+.intro-hint{
+  position:fixed;
+  left:50%;
+  bottom:5vh;
+  transform:translateX(-50%);
+  z-index:22;
+  font-family:'Inter',sans-serif;
+  font-size:0.68rem;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:rgba(244,246,255,0.32);
+  opacity:0;
+  animation:hintIn 2s ease forwards 2.2s, hintOut 2s ease forwards 8s;
+  pointer-events:none;
+  text-align:center;
+}
+@keyframes hintIn{ to{ opacity:1; } }
+@keyframes hintOut{ to{ opacity:0; } }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:720px){
+  .lyric-line{ font-size:clamp(1.3rem, 6.4vw, 2.1rem); max-width:14ch; }
+  .lyric-eyebrow{ letter-spacing:4px; font-size:0.62rem; }
+  .layer-galaxy{ transform:translate3d(calc(var(--cam-x) * 22px), calc(var(--cam-y) * 22px), 40px) rotate(calc(var(--cam-x) * 1deg)); }
+  .rig{ transform:rotateY(calc(var(--cam-x) * 2deg)) rotateX(calc(var(--cam-y) * -2deg)) translate3d(var(--shake-x), var(--shake-y), 0); }
+}
+
+@media (min-width:1600px){
+  .lyric-line{ font-size:clamp(2rem, 3.6vw, 4.2rem); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; }
+  .rig{ transform:none !important; }
+  .grain{ display:none; }
+}
