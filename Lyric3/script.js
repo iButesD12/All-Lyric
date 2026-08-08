@@ -555,64 +555,56 @@
   // LYRIC ENGINE
   // ============================================================
   const LyricEngine = (() => {
-    const lyrics = [
-      { time: 0.5,  text: 'kita berdua, di antara jutaan bintang' },
-      { time: 6,    text: 'waktu berhenti, hanya kita yang bergerak' },
-      { time: 11.5, text: 'cahayamu menembus galaksi paling gelap' },
-      { time: 17,   text: 'seperti nova yang lahir dari keheningan' },
-      { time: 22.5, text: 'kupetik satu bintang, kuberi namamu' },
-      { time: 28,   text: 'dan semesta pun tersenyum melihat kita' },
-      { time: 33.5, text: 'selama galaksi berputar, aku di sini' }
-    ];
-    const CYCLE = 40; // seconds, then loops
+  const lyrics = [
+    { text: "christmas eve with your mother and sis", duration: 2500 },
+    { text: "don't wanna fight but your mother insits", duration: 2500 },
+    { text: "dog's white teeth slice right into my fist", duration: 2000 },
+    { text: "drive to the ER, and they put me on risk", duration: 2600 },
+    { text: "grocery stre list, now you get pissed", duration: 2200 },
+    { text: "unchecked calls and messages", duration: 2000 },
+    { text: "i don't wanna be the owner of your fantasy", duration: 2000 },
+    { text: "i just wanna be a part of you family", duration: 1500 },
+    { text: "and i don't wanna talk about anything", duraion: 1000 },
+    { text: "i don't wanna talk about anything", duration: 1000 },
+    { text: "i wanna kiss, kiss your eyes again", duration: 2000 },
+    { text: "wanna witness your eyes lookin'", duration: 2000 }
+  ];
 
-    const el = document.getElementById('lyric-line');
-    let currentIndex = -1;
-    let startTime = null;
-    let exiting = false;
-    let exitUntil = 0;
-    let pendingIndex = -1;
+  const FADE_DURATION = 700; // 700ms = 0.7 detik
 
-    function showLine(text) {
-      el.textContent = text;
-      el.classList.remove('exit');
-      // force reflow so the enter animation restarts reliably
-      void el.offsetWidth;
-      el.classList.add('enter');
+  const el = document.getElementById('lyric-line');
+  let currentIndex = 0;
+  let state = 'show';
+  let nextChange = performance.now();
+
+  function showLine(text) {
+    el.textContent = text;
+    el.classList.remove('exit');
+    void el.offsetWidth;
+    el.classList.add('enter');
+  }
+
+  showLine(lyrics[currentIndex].text);
+  nextChange = performance.now() + lyrics[currentIndex].duration;
+
+  function update() {
+    const now = performance.now();
+
+    if (state === 'show' && now >= nextChange) {
+      state = 'exit';
+      el.classList.remove('enter');
+      el.classList.add('exit');
+      nextChange = now + FADE_DURATION;
+    } else if (state === 'exit' && now >= nextChange) {
+      currentIndex = (currentIndex + 1) % lyrics.length;
+      showLine(lyrics[currentIndex].text);
+      state = 'show';
+      nextChange = now + lyrics[currentIndex].duration;
     }
+  }
 
-    function update(t) {
-      if (startTime === null) startTime = t;
-      const elapsed = (t - startTime) % CYCLE;
-
-      // find the lyric line whose time window we're in
-      let idx = -1;
-      for (let i = lyrics.length - 1; i >= 0; i--) {
-        if (elapsed >= lyrics[i].time) { idx = i; break; }
-      }
-
-      if (idx !== currentIndex && idx !== -1 && !exiting) {
-        if (currentIndex === -1) {
-          currentIndex = idx;
-          showLine(lyrics[idx].text);
-        } else {
-          exiting = true;
-          pendingIndex = idx;
-          el.classList.remove('enter');
-          el.classList.add('exit');
-          exitUntil = performance.now() + 700;
-        }
-      }
-
-      if (exiting && performance.now() >= exitUntil) {
-        exiting = false;
-        currentIndex = pendingIndex;
-        showLine(lyrics[currentIndex].text);
-      }
-    }
-
-    return { update };
-  })();
+  return { update };
+})();
 
   // ============================================================
   // INTERACTION ENGINE — click / tap → burst + shake
