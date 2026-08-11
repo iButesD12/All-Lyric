@@ -1,0 +1,899 @@
+This HTML creates a cinematic, fullscreen lyric animation with a digital rain effect and a smooth lyric reveal sequence.
+
+```html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>ABOUT YOU – Cinematic Lyric</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+        /* style.css – fullscreen black, white mono, no scroll */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000000;
+            font-family: 'IBM Plex Mono', 'Space Mono', 'Courier New', monospace;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background: #000000;
+            image-rendering: auto;
+        }
+
+        /* fallback for very old browsers */
+        .no-canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // ============================================================
+        // script.js – cinematic lyric animation with digital rain,
+        // lyric reveal, smooth transitions, and sparkle effects.
+        // No libraries, pure Canvas + requestAnimationFrame.
+        // ============================================================
+
+        (function() {
+            'use strict';
+
+            // ---------- CONFIGURATION LYRIC ----------
+            const TITLE = 'When I Was Your Man';
+            const LYRICS = [
+'But she\'s dancing with another man',
+'Although it hurts',
+'I\'ll be the first to say that I was wrong',
+'Oh, I know I\'m probably much too late',
+'To try and apologize for my mistakes',
+'But I just want you to know',
+'I hope he buys you flowers',
+'I hope he holds your hand',
+'Give you all his hours',
+'When he has the chance'
+            ];
+
+            // Timing (seconds)
+            const TIMING = {
+                introFadeIn: 1.2,
+                introHold: 3.0,
+                introFadeOut: 1.2,
+                rainBeforeFirst: 2.5,
+                charRevealInterval: 0.08, // seconds per char reveal
+                lyricHold: 3.5,
+                transitionScatter: 1.8,
+                transitionReform: 1.8,
+                postLyricFade: 1.5,
+            };
+
+            const CHAR_SET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\`\'\"';
+            const RAIN_COUNT = 220;
+            const SPARKLE_COUNT = 30;
+            const FONT_FAMILY = "'IBM Plex Mono', 'Space Mono', 'Courier New', monospace";
+
+            // ---------- CANVAS SETUP ----------
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            let W, H, centerX, centerY, baseFontSize;
+
+            function resize() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                W = canvas.width = rect.width || window.innerWidth;
+                H = canvas.height = rect.height || window.innerHeight;
+                centerX = W / 2;
+                centerY = H / 2;
+                baseFontSize = Math.max(18, Math.min(W, H) * 0.055);
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
+
+            // ---------- UTILITY ----------
+            function randomChar() {
+                return CHAR_SET[Math.floor(Math.random() * CHAR_SET.length)];
+            }
+
+            function lerp(a, b, t) { return a + (b - a) * t; }
+
+            function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+            function rand(min, max) { return Math.random() * (max - min) + min; }
+
+            function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+
+            function easeInOut(t) {
+                return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            }
+
+            // ---------- RAIN DROP ----------
+            class RainDrop {
+                constructor() {
+                    this.reset(true);
+                }
+
+                reset(initial) {
+                    this.x = rand(0, W);
+                    this.y = initial ? rand(-H * 0.2, H * 0.1) : rand(-H * 0.5, -10);
+                    this.speed = rand(1.2, 3.8);
+                    this.size = rand(0.55, 1.3);
+                    this.opacity = rand(0.15, 0.85);
+                    this.char = randomChar();
+                    this.phase = rand(0, Math.PI * 2);
+                }
+
+                update() {
+                    this.y += this.speed * 0.9;
+                    this.phase += 0.02;
+                    // slight horizontal drift
+                    this.x += Math.sin(this.phase) * 0.12;
+                    if (this.y > H + 10) {
+                        this.reset(false);
+                        this.y = rand(-H * 0.3, -10);
+                        this.x = rand(0, W);
+                        this.char = randomChar();
+                    }
+                }
+
+                draw(ctx, globalOpacity) {
+                    const o = this.opacity * globalOpacity * (0.85 + 0.15 * Math.sin(this.phase));
+                    if (o < 0.01) return;
+                    const sz = this.size * baseFontSize * 0.6;
+                    ctx.save();
+                    ctx.globalAlpha = clamp(o, 0, 1);
+                    ctx.font = `${sz}px ${FONT_FAMILY}`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(this.char, this.x, this.y);
+                    ctx.restore();
+                }
+            }
+
+            // ---------- SPARKLE ----------
+            class Sparkle {
+                constructor() {
+                    this.reset(true);
+                }
+
+                reset(initial) {
+                    this.x = rand(0, W);
+                    this.y = rand(0, H);
+                    this.size = rand(1.5, 4.5);
+                    this.life = 0;
+                    this.duration = rand(1.2, 3.5);
+                    this.phase = rand(0, Math.PI * 2);
+                    this.pulseSpeed = rand(0.8, 2.2);
+                    if (!initial) {
+                        this.x = rand(0, W);
+                        this.y = rand(0, H);
+                    }
+                }
+
+                update(dt) {
+                    this.life += dt;
+                    this.phase += dt * this.pulseSpeed;
+                    if (this.life > this.duration) {
+                        this.reset(false);
+                    }
+                }
+
+                draw(ctx) {
+                    const progress = this.life / this.duration;
+                    // fade in/out with smooth curve
+                    let fade = 0;
+                    if (progress < 0.15) fade = progress / 0.15;
+                    else if (progress > 0.75) fade = 1 - (progress - 0.75) / 0.25;
+                    else fade = 1;
+                    // pulse
+                    const pulse = 0.7 + 0.3 * Math.sin(this.phase);
+                    const o = fade * pulse * 0.65;
+                    if (o < 0.01) return;
+                    const sz = this.size * (0.8 + 0.2 * pulse);
+                    ctx.save();
+                    ctx.globalAlpha = clamp(o, 0, 1);
+                    // glow
+                    const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, sz * 2.2);
+                    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+                    grad.addColorStop(0.3, 'rgba(255,255,255,0.5)');
+                    grad.addColorStop(1, 'rgba(255,255,255,0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, sz * 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    // core
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, sz * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                    // cross sparkle
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                    ctx.lineWidth = 0.8;
+                    const c = sz * 0.7;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - c, this.y);
+                    ctx.lineTo(this.x + c, this.y);
+                    ctx.moveTo(this.x, this.y - c);
+                    ctx.lineTo(this.x, this.y + c);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // ---------- LYRIC CHARACTER ----------
+            class LyricChar {
+                constructor(char, x, y, fontSize) {
+                    this.target = char;
+                    this.current = randomChar();
+                    this.x = x;
+                    this.y = y;
+                    this.fontSize = fontSize;
+                    this.locked = false;
+                    this.scale = 1;
+                    this.glowIntensity = 0;
+                    this.isRevealing = false;
+                    this.revealProgress = 0;
+                }
+
+                // Try to reveal: change to a random char, lock if matches target
+                attemptReveal() {
+                    if (this.locked) return false;
+                    this.current = randomChar();
+                    if (this.current === this.target) {
+                        this.locked = true;
+                        this.glowIntensity = 1;
+                        this.isRevealing = true;
+                        this.revealProgress = 0;
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Force set to target (used during transition reform)
+                forceLock() {
+                    this.current = this.target;
+                    this.locked = true;
+                    this.glowIntensity = 0.6;
+                    this.isRevealing = true;
+                    this.revealProgress = 0;
+                }
+
+                update(dt) {
+                    if (this.isRevealing) {
+                        this.revealProgress += dt * 2.5;
+                        if (this.revealProgress >= 1) {
+                            this.revealProgress = 1;
+                            this.isRevealing = false;
+                            this.scale = 1;
+                        } else {
+                            const t = easeInOut(this.revealProgress);
+                            this.scale = 1 + 0.35 * (1 - t);
+                        }
+                    }
+                    this.glowIntensity *= 0.96;
+                    if (this.glowIntensity < 0.01) this.glowIntensity = 0;
+                }
+
+                draw(ctx, globalAlpha) {
+                    const alpha = globalAlpha * (this.locked ? 1 : 0.5 + 0.5 * Math.random());
+                    const sz = this.fontSize * (this.locked ? 1 : 0.92 + 0.08 * Math.sin(Date.now() / 300 + this.x));
+                    const s = this.scale || 1;
+                    ctx.save();
+                    ctx.globalAlpha = clamp(alpha, 0, 1);
+                    ctx.font = `${sz * s}px ${FONT_FAMILY}`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    if (this.locked && this.glowIntensity > 0.02) {
+                        // Glow
+                        const grad = ctx.createRadialGradient(
+                            this.x, this.y, 0,
+                            this.x, this.y, sz * 1.6
+                        );
+                        grad.addColorStop(0, `rgba(255,255,255,${this.glowIntensity * 0.5})`);
+                        grad.addColorStop(1, 'rgba(255,255,255,0)');
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, sz * 1.6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    ctx.fillStyle = '#ffffff';
+                    if (this.locked) {
+                        ctx.shadowColor = 'rgba(255,255,255,0.15)';
+                        ctx.shadowBlur = sz * 0.5;
+                    }
+                    ctx.fillText(this.current, this.x, this.y);
+                    ctx.shadowBlur = 0;
+                    ctx.restore();
+                }
+            }
+
+            // ---------- MAIN CONTROLLER ----------
+            class LyricController {
+                constructor() {
+                    this.rainDrops = [];
+                    this.sparkles = [];
+                    this.lyricChars = [];
+                    this.currentLyricIndex = 0;
+                    this.stage = 'intro'; // intro | rain | revealing | holding | transitioning | completed
+                    this.stageTime = 0;
+                    this.introPhase = 0; // 0=fadein, 1=hold, 2=fadeout
+                    this.revealOrder = [];
+                    this.revealIndex = 0;
+                    this.transitionPhase = 0; // 0=scatter, 1=reform
+                    this.globalRainOpacity = 1;
+                    this.globalLyricOpacity = 0;
+                    this.isTransitioning = false;
+                    this.transitionChars = [];
+                    this.allLyricsRevealed = false;
+                    this.lastTimestamp = 0;
+
+                    // Initialize rain
+                    for (let i = 0; i < RAIN_COUNT; i++) {
+                        this.rainDrops.push(new RainDrop());
+                    }
+                    // Initialize sparkles
+                    for (let i = 0; i < SPARKLE_COUNT; i++) {
+                        this.sparkles.push(new Sparkle());
+                    }
+
+                    // Build first lyric
+                    this.buildLyric(0);
+                    // Start with lyrics hidden
+                    this.globalLyricOpacity = 0;
+
+                    // Start intro
+                    this.stage = 'intro';
+                    this.stageTime = 0;
+                    this.introPhase = 0;
+                }
+
+                buildLyric(index) {
+                    const text = LYRICS[index] || '';
+                    this.lyricChars = [];
+                    const fontSize = baseFontSize * 1.1;
+                    const spacing = fontSize * 0.7;
+                    const totalWidth = text.length * spacing;
+                    const startX = centerX - totalWidth / 2 + spacing / 2;
+                    const y = centerY;
+
+                    for (let i = 0; i < text.length; i++) {
+                        const char = text[i];
+                        const x = startX + i * spacing;
+                        const lc = new LyricChar(char, x, y, fontSize);
+                        // For spaces, just lock them immediately
+                        if (char === ' ') {
+                            lc.current = ' ';
+                            lc.locked = true;
+                        }
+                        this.lyricChars.push(lc);
+                    }
+
+                    // Build reveal order (random)
+                    this.revealOrder = [];
+                    for (let i = 0; i < this.lyricChars.length; i++) {
+                        if (this.lyricChars[i].target !== ' ') {
+                            this.revealOrder.push(i);
+                        }
+                    }
+                    // Shuffle
+                    for (let i = this.revealOrder.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [this.revealOrder[i], this.revealOrder[j]] = [this.revealOrder[j], this.revealOrder[i]];
+                    }
+                    this.revealIndex = 0;
+                }
+
+                // Start revealing the current lyric
+                startReveal() {
+                    this.stage = 'revealing';
+                    this.stageTime = 0;
+                    this.revealIndex = 0;
+                    this.globalLyricOpacity = 1;
+                    // Reset chars
+                    for (const lc of this.lyricChars) {
+                        if (lc.target !== ' ') {
+                            lc.current = randomChar();
+                            lc.locked = false;
+                            lc.glowIntensity = 0;
+                            lc.isRevealing = false;
+                            lc.scale = 1;
+                        }
+                    }
+                    // Shuffle reveal order again for variety
+                    for (let i = this.revealOrder.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [this.revealOrder[i], this.revealOrder[j]] = [this.revealOrder[j], this.revealOrder[i]];
+                    }
+                    this.revealIndex = 0;
+                    // Rain starts fading near lyric
+                }
+
+                // Transition to next lyric
+                startTransition() {
+                    this.stage = 'transitioning';
+                    this.stageTime = 0;
+                    this.transitionPhase = 0; // 0=scatter, 1=reform
+                    this.isTransitioning = true;
+                    this.globalRainOpacity = 0.3;
+
+                    // Save current lyric chars for transition
+                    this.transitionChars = this.lyricChars.map(lc => ({
+                        x: lc.x,
+                        y: lc.y,
+                        targetX: lc.x,
+                        targetY: lc.y,
+                        char: lc.current,
+                        locked: lc.locked,
+                        target: lc.target,
+                        fontSize: lc.fontSize,
+                        velX: rand(-8, 8),
+                        velY: rand(-8, 8),
+                    }));
+
+                    // Scatter them
+                    for (const tc of this.transitionChars) {
+                        const angle = rand(0, Math.PI * 2);
+                        const dist = rand(150, 400);
+                        tc.targetX = tc.x + Math.cos(angle) * dist;
+                        tc.targetY = tc.y + Math.sin(angle) * dist - rand(0, 100);
+                        tc.velX = rand(-12, 12);
+                        tc.velY = rand(-12, 12);
+                    }
+                }
+
+                // Reform with next lyric
+                reformLyric(nextIndex) {
+                    // Build the new lyric
+                    this.buildLyric(nextIndex);
+                    // Position them at scattered positions
+                    const scatterRadius = Math.min(W, H) * 0.45;
+                    for (const lc of this.lyricChars) {
+                        const angle = rand(0, Math.PI * 2);
+                        const dist = rand(scatterRadius * 0.5, scatterRadius);
+                        lc.x += Math.cos(angle) * dist;
+                        lc.y += Math.sin(angle) * dist;
+                        lc.current = randomChar();
+                        lc.locked = false;
+                        lc.glowIntensity = 0;
+                        lc.isRevealing = false;
+                        lc.scale = 1;
+                        if (lc.target === ' ') {
+                            lc.current = ' ';
+                            lc.locked = true;
+                        }
+                    }
+
+                    // Shuffle reveal order
+                    this.revealOrder = [];
+                    for (let i = 0; i < this.lyricChars.length; i++) {
+                        if (this.lyricChars[i].target !== ' ') {
+                            this.revealOrder.push(i);
+                        }
+                    }
+                    for (let i = this.revealOrder.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [this.revealOrder[i], this.revealOrder[j]] = [this.revealOrder[j], this.revealOrder[i]];
+                    }
+                    this.revealIndex = 0;
+
+                    // Transition phase: reform
+                    this.transitionPhase = 1;
+                    this.stageTime = 0;
+                    this.globalRainOpacity = 0.15;
+
+                    // Store target positions for smooth interpolation
+                    const targetPositions = this.lyricChars.map(lc => ({ x: lc.x, y: lc.y }));
+                    // Store initial scattered positions
+                    const scatterPositions = this.lyricChars.map(lc => ({ x: lc.x, y: lc.y }));
+
+                    // We'll animate them moving to center
+                    const centerPositions = [];
+                    const fontSize = baseFontSize * 1.1;
+                    const spacing = fontSize * 0.7;
+                    const text = LYRICS[nextIndex] || '';
+                    const totalWidth = text.length * spacing;
+                    const startX = centerX - totalWidth / 2 + spacing / 2;
+                    const y = centerY;
+
+                    for (let i = 0; i < text.length; i++) {
+                        const x = startX + i * spacing;
+                        centerPositions.push({ x, y });
+                    }
+
+                    // Store both for interpolation
+                    this._scatterPos = scatterPositions;
+                    this._centerPos = centerPositions;
+                    this._reformProgress = 0;
+                }
+
+                update(dt) {
+                    this.stageTime += dt;
+
+                    // Update sparkles always
+                    for (const s of this.sparkles) {
+                        s.update(dt);
+                    }
+
+                    // Update rain always (but opacity varies)
+                    for (const r of this.rainDrops) {
+                        r.update();
+                    }
+
+                    // ----- STAGE MACHINE -----
+                    switch (this.stage) {
+                        case 'intro': {
+                            const totalIntro = TIMING.introFadeIn + TIMING.introHold + TIMING.introFadeOut;
+                            const t = this.stageTime;
+                            if (t < TIMING.introFadeIn) {
+                                this.introPhase = 0; // fade in
+                                this.globalLyricOpacity = t / TIMING.introFadeIn;
+                            } else if (t < TIMING.introFadeIn + TIMING.introHold) {
+                                this.introPhase = 1; // hold
+                                this.globalLyricOpacity = 1;
+                            } else if (t < totalIntro) {
+                                this.introPhase = 2; // fade out
+                                const p = (t - TIMING.introFadeIn - TIMING.introHold) / TIMING.introFadeOut;
+                                this.globalLyricOpacity = 1 - p;
+                            } else {
+                                // Intro done, start rain
+                                this.stage = 'rain';
+                                this.stageTime = 0;
+                                this.globalLyricOpacity = 0;
+                                this.globalRainOpacity = 1;
+                                // Build the first lyric (hidden)
+                                this.buildLyric(0);
+                                for (const lc of this.lyricChars) {
+                                    if (lc.target !== ' ') {
+                                        lc.current = randomChar();
+                                        lc.locked = false;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+
+                        case 'rain': {
+                            this.globalRainOpacity = 1;
+                            this.globalLyricOpacity = 0;
+                            if (this.stageTime > TIMING.rainBeforeFirst) {
+                                // Start revealing first lyric
+                                this.startReveal();
+                            }
+                            break;
+                        }
+
+                        case 'revealing': {
+                            // Rain opacity: starts at 1, gradually reduces as lyric reveals
+                            const revealProgress = this.revealIndex / Math.max(1, this.revealOrder.length);
+                            this.globalRainOpacity = 1 - revealProgress * 0.85;
+                            this.globalLyricOpacity = 1;
+
+                            // Reveal characters at intervals
+                            const interval = TIMING.charRevealInterval;
+                            const charsToReveal = Math.floor(this.stageTime / interval);
+                            const maxReveal = this.revealOrder.length;
+                            const count = Math.min(charsToReveal, maxReveal);
+
+                            let revealed = 0;
+                            for (let i = 0; i < count && i < maxReveal; i++) {
+                                const idx = this.revealOrder[i];
+                                if (idx < this.lyricChars.length && !this.lyricChars[idx].locked) {
+                                    const success = this.lyricChars[idx].attemptReveal();
+                                    if (success) revealed++;
+                                }
+                            }
+                            this.revealIndex = count;
+
+                            // Update lyric chars
+                            for (const lc of this.lyricChars) {
+                                lc.update(dt);
+                            }
+
+                            // Check if all revealed
+                            if (this.revealIndex >= this.revealOrder.length) {
+                                // All characters revealed
+                                let allLocked = true;
+                                for (const lc of this.lyricChars) {
+                                    if (lc.target !== ' ' && !lc.locked) allLocked = false;
+                                }
+                                if (allLocked) {
+                                    // Move to hold
+                                    this.stage = 'holding';
+                                    this.stageTime = 0;
+                                    this.globalRainOpacity = 0.05;
+                                    this.globalLyricOpacity = 1;
+                                }
+                            }
+                            break;
+                        }
+
+                        case 'holding': {
+                            this.globalRainOpacity = 0.03;
+                            this.globalLyricOpacity = 1;
+                            for (const lc of this.lyricChars) {
+                                lc.update(dt);
+                            }
+                            if (this.stageTime > TIMING.lyricHold) {
+                                // Check if there are more lyrics
+                                if (this.currentLyricIndex < LYRICS.length - 1) {
+                                    this.startTransition();
+                                } else {
+                                    // All lyrics done
+                                    this.stage = 'completed';
+                                    this.globalRainOpacity = 0.02;
+                                    this.globalLyricOpacity = 1;
+                                }
+                            }
+                            break;
+                        }
+
+                        case 'transitioning': {
+                            const transitionDuration = TIMING.transitionScatter + TIMING.transitionReform;
+                            const t = this.stageTime;
+
+                            if (t < TIMING.transitionScatter) {
+                                // Scatter phase
+                                this.transitionPhase = 0;
+                                const p = t / TIMING.transitionScatter;
+                                this.globalRainOpacity = 0.3 + 0.7 * p;
+                                this.globalLyricOpacity = 1 - p;
+
+                                // Animate transition chars scattering
+                                if (this.transitionChars.length > 0) {
+                                    for (let i = 0; i < this.transitionChars.length; i++) {
+                                        const tc = this.transitionChars[i];
+                                        const ease = easeInOut(p);
+                                        tc.x = lerp(tc.x, tc.targetX, ease * 0.06);
+                                        tc.y = lerp(tc.y, tc.targetY, ease * 0.06);
+                                        tc.x += tc.velX * 0.02;
+                                        tc.y += tc.velY * 0.02;
+                                        tc.velX *= 0.98;
+                                        tc.velY *= 0.98;
+                                    }
+                                }
+                                // Draw scattered chars
+                                this._scatterChars = this.transitionChars;
+
+                            } else if (t < transitionDuration) {
+                                // Reform phase
+                                this.transitionPhase = 1;
+                                const p = (t - TIMING.transitionScatter) / TIMING.transitionReform;
+                                this.globalRainOpacity = 0.15 + 0.1 * p;
+                                this.globalLyricOpacity = p;
+
+                                if (this._centerPos && this._scatterPos) {
+                                    const ease = easeInOut(p);
+                                    for (let i = 0; i < this.lyricChars.length && i < this._centerPos.length; i++) {
+                                        const lc = this.lyricChars[i];
+                                        const from = this._scatterPos[i] || { x: lc.x, y: lc.y };
+                                        const to = this._centerPos[i] || { x: lc.x, y: lc.y };
+                                        lc.x = lerp(from.x, to.x, ease);
+                                        lc.y = lerp(from.y, to.y, ease);
+                                        // Characters start random and gradually reveal
+                                        if (p > 0.3 && !lc.locked && lc.target !== ' ') {
+                                            // Randomly attempt reveal during reform
+                                            if (Math.random() < 0.03) {
+                                                lc.attemptReveal();
+                                            }
+                                        }
+                                        lc.update(dt);
+                                    }
+                                }
+
+                                // If we're near the end, force any remaining chars to lock
+                                if (p > 0.85) {
+                                    for (const lc of this.lyricChars) {
+                                        if (lc.target !== ' ' && !lc.locked) {
+                                            if (Math.random() < 0.08) {
+                                                lc.attemptReveal();
+                                            }
+                                        }
+                                    }
+                                }
+
+                            } else {
+                                // Transition complete, move to next lyric reveal
+                                this.currentLyricIndex++;
+                                this.isTransitioning = false;
+                                // If all lyrics are done, go to completed
+                                if (this.currentLyricIndex >= LYRICS.length) {
+                                    this.stage = 'completed';
+                                    this.globalRainOpacity = 0.02;
+                                    this.globalLyricOpacity = 1;
+                                    this.allLyricsRevealed = true;
+                                } else {
+                                    // Build the lyric and start reveal
+                                    this.buildLyric(this.currentLyricIndex);
+                                    // Make sure all chars are random
+                                    for (const lc of this.lyricChars) {
+                                        if (lc.target !== ' ') {
+                                            lc.current = randomChar();
+                                            lc.locked = false;
+                                        }
+                                    }
+                                    this.startReveal();
+                                    this.globalRainOpacity = 0.6;
+                                }
+                            }
+                            break;
+                        }
+                        
+                        case 'completed': {
+                            this.globalRainOpacity = 0.02;
+                            this.globalLyricOpacity = 1;
+                            for (const lc of this.lyricChars) {
+                                lc.update(dt);
+                            }
+                            break;
+                        }
+
+                        default:
+                            break;
+                    }
+
+                    // Clamp values
+                    this.globalRainOpacity = clamp(this.globalRainOpacity, 0, 1);
+                    this.globalLyricOpacity = clamp(this.globalLyricOpacity, 0, 1);
+                }
+
+                // ---------- RENDER ----------
+                render() {
+                    // Clear with black
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, W, H);
+
+                    // --- Draw rain ---
+                    if (this.globalRainOpacity > 0.005) {
+                        // Sort rain drops by y for depth effect
+                        const sortedRain = [...this.rainDrops].sort((a, b) => a.y - b.y);
+                        for (const r of sortedRain) {
+                            // Fade rain near center when lyric is visible
+                            let fade = 1;
+                            if (this.globalLyricOpacity > 0.3) {
+                                const distFromCenter = Math.hypot(r.x - centerX, r.y - centerY);
+                                const maxDist = Math.min(W, H) * 0.3;
+                                if (distFromCenter < maxDist) {
+                                    const t = distFromCenter / maxDist;
+                                    fade = 0.05 + 0.95 * t;
+                                    fade = Math.pow(fade, 1.5);
+                                }
+                            }
+                            const opacity = this.globalRainOpacity * fade;
+                            if (opacity > 0.005) {
+                                r.draw(ctx, opacity);
+                            }
+                        }
+                    }
+
+                    // --- Draw sparkles (on top of rain, behind lyrics) ---
+                    for (const s of this.sparkles) {
+                        s.draw(ctx);
+                    }
+
+                    // --- Draw lyric ---
+                    if (this.globalLyricOpacity > 0.005) {
+                        // For intro, draw title instead of lyrics
+                        if (this.stage === 'intro') {
+                            const fontSize = baseFontSize * 2.2;
+                            ctx.save();
+                            ctx.globalAlpha = this.globalLyricOpacity;
+                            ctx.font = `700 ${fontSize}px ${FONT_FAMILY}`;
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            // Zoom effect during intro
+                            const zoom = 1 + 0.06 * (1 - Math.abs(this.globalLyricOpacity - 0.5) * 2);
+                            ctx.setTransform(zoom, 0, 0, zoom, centerX, centerY);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.shadowColor = 'rgba(255,255,255,0.08)';
+                            ctx.shadowBlur = fontSize * 0.3;
+                            ctx.fillText(TITLE, 0, 0);
+                            ctx.shadowBlur = 0;
+                            ctx.restore();
+                        } else {
+                            // Draw lyric characters
+                            const alpha = this.globalLyricOpacity;
+                            for (const lc of this.lyricChars) {
+                                lc.draw(ctx, alpha);
+                            }
+                        }
+                    }
+
+                    // --- Draw transition scattered chars (if in transition scatter phase) ---
+                    if (this.stage === 'transitioning' && this.transitionPhase === 0 && this._scatterChars) {
+                        const alpha = this.globalLyricOpacity;
+                        for (const tc of this._scatterChars) {
+                            if (!tc) continue;
+                            ctx.save();
+                            ctx.globalAlpha = clamp(alpha, 0, 1);
+                            const sz = tc.fontSize || baseFontSize * 1.1;
+                            ctx.font = `${sz * 0.9}px ${FONT_FAMILY}`;
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillText(tc.char || randomChar(), tc.x, tc.y);
+                            ctx.restore();
+                        }
+                    }
+
+                    // Subtle vignette
+                    const grad = ctx.createRadialGradient(centerX, centerY, Math.min(W, H) * 0.1, centerX, centerY, Math.max(W,
+                        H) * 0.75);
+                    grad.addColorStop(0, 'rgba(0,0,0,0)');
+                    grad.addColorStop(1, 'rgba(0,0,0,0.45)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(0, 0, W, H);
+                }
+
+                // ---------- LOOP ----------
+                loop(timestamp) {
+                    const dt = Math.min((timestamp - this.lastTimestamp) / 1000, 0.05);
+                    this.lastTimestamp = timestamp;
+
+                    this.update(dt);
+                    this.render();
+
+                    requestAnimationFrame((t) => this.loop(t));
+                }
+
+                start() {
+                    this.lastTimestamp = performance.now();
+                    requestAnimationFrame((t) => this.loop(t));
+                }
+            }
+
+            // ---------- INIT ----------
+            const controller = new LyricController();
+            controller.start();
+
+            // Handle resize
+            window.addEventListener('resize', () => {
+                resize();
+                // Rebuild lyric positions if needed
+                if (controller.stage !== 'intro') {
+                    const idx = controller.currentLyricIndex;
+                    if (idx < LYRICS.length) {
+                        const text = LYRICS[idx] || '';
+                        const fontSize = baseFontSize * 1.1;
+                        const spacing = fontSize * 0.7;
+                        const totalWidth = text.length * spacing;
+                        const startX = centerX - totalWidth / 2 + spacing / 2;
+                        const y = centerY;
+                        for (let i = 0; i < controller.lyricChars.length && i < text.length; i++) {
+                            controller.lyricChars[i].x = startX + i * spacing;
+                            controller.lyricChars[i].y = y;
+                            controller.lyricChars[i].fontSize = fontSize;
+                        }
+                        // Update center positions for transition
+                        if (controller._centerPos) {
+                            controller._centerPos = [];
+                            for (let i = 0; i < text.length; i++) {
+                                controller._centerPos.push({ x: startX + i * spacing, y });
+                            }
+                        }
+                    }
+                }
+            });
+
+            console.log('🎬 Cinematic Lyric Animation started.');
+            console.log(`📝 Lyrics: ${LYRICS.length} lines · "${LYRICS.join('" → "')}"`);
+
+        })();
+    </script>
+</body>
+</html>
